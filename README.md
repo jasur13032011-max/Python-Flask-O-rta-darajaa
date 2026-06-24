@@ -1,105 +1,123 @@
 # Python-Flask-O-rta-darajaa
-Loyiha strukturasi
-Sizda loyiha quyidagi ko'rinishda shakllanadi:
-
-Plaintext
-my_flask_app/
-├── config.py
-├── wsgi.py
-├── README.md
-└── app/
-    └── __init__.py
-1. config.py
-Barcha konfiguratsiyalar bitta joyda jamlanadi va SECRET_KEY muhit o'zgaruvchilaridan (os.environ) xavfsiz o'qiladi.
+├── __init__.py
+    ├── main/
+    │   ├── __init__.py
+    │   └── routes.py
+    ├── notes/
+    │   ├── __init__.py
+    │   └── routes.py
+    └── templates/
+        ├── base.html
+        ├── main/
+        │   └── index.html
+        └── notes/
+            └── list.html
+1. Kodlarni Yangilash va Blueprint'larni Kiritish
+app/main/__init__.py
+main blueprint'ini e'lon qilamiz:
 
 Python
-import os
+from flask import Blueprint
 
-class Config:
-    """Asosiy (baza) konfiguratsiya klassi"""
-    SECRET_KEY = os.environ.get('SECRET_KEY', 'default-super-secret-key')
-    SQLALCHEMY_TRACK_MODIFICATIONS = False
+main_bp = Blueprint('main', __name__)
 
-class DevelopmentConfig(Config):
-    """Developerlik muhiti uchun"""
-    DEBUG = True
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DEV_DATABASE_URL', 'sqlite:///dev.db')
+from app.main import routes
+app/main/routes.py
+Bosh sahifa logikasi:
 
-class TestingConfig(Config):
-    """Testlar muhiti uchun"""
-    TESTING = True
-    SQLALCHEMY_DATABASE_URI = os.environ.get('TEST_DATABASE_URL', 'sqlite:///test.db')
+Python
+from flask import render_template
+from app.main import main_bp
 
-class ProductionConfig(Config):
-    """Jonli (Production) muhit uchun"""
-    DEBUG = False
-    # Productionda default qiymat berilmaydi, SECRET_KEY shart bo'lishi kerak!
-    SECRET_KEY = os.environ.get('SECRET_KEY') 
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL')
+@main_bp.route('/')
+def index():
+    return render_template('main/index.html')
+app/notes/__init__.py
+notes blueprint'ini url_prefix bilan e'lon qilish uchun sozlaymiz:
 
-# Konfiguratsiyalarni nom bo'yicha chaqirish uchun lug'at
-config_by_name = {
-    'development': DevelopmentConfig,
-    'testing': TestingConfig,
-    'production': ProductionConfig
-}
-2. app/__init__.py
-Ilovani yaratuvchi va unga konfiguratsiyani yuklovchi create_app factory funksiyasi.
+Python
+from flask import Blueprint
+
+notes_bp = Blueprint('notes', __name__)
+
+from app.notes import routes
+app/notes/routes.py
+Kamida 5 ta dastlabki eslatmaga ega ro'yxat va eslatmalar sahifasi:
+
+Python
+from flask import render_template
+from app.notes import notes_bp
+
+# Xotira ichidagi dummy ma'lumotlar (Python list)
+NOTES_DATA = [
+    {"id": 1, "title": "Xaridlar ro'yxati", "content": "Sut, non, tuxum va mevalar olish kerak."},
+    {"id": 2, "title": "Dasturlash", "content": "Flask Blueprint mavzusini takrorlash."},
+    {"id": 3, "title": "Sport", "content": "Bugun soat 18:00 da yugurish bor."},
+    {"id": 4, "title": "Kitobxonlik", "content": "Har kuni kamida 20 sahifa kitob o'qish."},
+    {"id": 5, "title": "Eslatma", "content": "Yangi loyiha arxitekturasini chizish."}
+]
+
+@notes_bp.route('/')
+def list_notes():
+    return render_template('notes/list.html', notes=NOTES_DATA)
+2. Factory funksiyada Blueprint'larni ro'yxatdan o'tkazish
+app/__init__.py
+Eski holatdagi oddiy route o'rniga, endi blueprint'larni registratsiya qilamiz va notes_bp uchun /notes prefiksini beramiz:
 
 Python
 from flask import Flask
 from config import config_by_name
 
 def create_app(config_name='development'):
-    """Application Factory funksiyasi"""
     app = Flask(__name__)
-    
-    # Berilgan nom bo'yicha konfiguratsiyani yuklash
     app.config.from_object(config_by_name[config_name])
     
-    # Oddiy test route
-    @app.route('/')
-    def index():
-        return f"Hozirgi muhit: {config_name.upper()}"
+    # Blueprint'larni import qilish
+    from app.main import main_bp
+    from app.notes import notes_bp
+    
+    # Ro'yxatdan o'tkazish
+    app.register_blueprint(main_bp)
+    app.register_blueprint(notes_bp, url_prefix='/notes')  # /notes prefiksi shu yerda o'rnatiladi
         
     return app
-3. wsgi.py
-Faqat factory funksiyani chaqiradigan va server ishga tushishi uchun kirish nuqtasi bo'lgan ixcham fayl.
+3. Jinja2 Shablonlari (Templates)
+Barcha o'tish havolalari xavfsiz va dinamik bo'lishi uchun url_for('blueprint_nomi.funksiya_nomi') ko'rinishida yoziladi.
 
-Python
-import os
-from app import create_app
-
-env = os.environ.get('FLASK_ENV', 'development')
-app = create_app(config_name=env)
-4. README.md
-Loyiha muhitlarini ishga tushirish yo'riqnomasi.
-
-Markdown
-# Flask Ilovasi
-
-Ushbu loyiha Application Factory pattern asosida qurilgan.
-
-## Ishga tushirish ko'rsatmalari
-
-### 1. Development (Dasturlash) muhitida ishga tushirish
-Development rejimida xatolar brauzerda ko'rinadi (Debug=True) va kod o'zgarganda server avtomatik qayta yuklanadi.
-
-```bash
-# Muhit o'zgaruvchilarini sozlash
-export FLASK_ENV=development
-export SECRET_KEY=mening_yashirin_kalitim_123
-
-# Serverni ishga tushirish
-flask run
-2. Production (Jonli) muhitda ishga tushirish
-Production rejimida xavfsizlik va tezlik uchun debug rejim o'chiriladi. Server gunicorn yoki uWSGI kabi WSGI serverlar orqali ishga tushiriladi.
-
-Bash
-# Muhit o'zgaruvchilarini sozlash (Majburiy!)
-export FLASK_ENV=production
-export SECRET_KEY=juda_kuchli_va_uzun_tasodifiy_satr_2026
-export DATABASE_URL=postgresql://user:password@localhost/dbname
-
-# Gunicorn orqali ishga tushirish (wsgi fayliga bog'lanadi)
-gunicorn wsgi:app
+app/templates/base.html
+HTML
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <title>Mening Bloknotim</title>
+</head>
+<body>
+    <nav>
+        <a href="{{ url_for('main.index') }}">Bosh sahifa</a> | 
+        <a href="{{ url_for('notes.list_notes') }}">Eslatmalar</a>
+    </nav>
+    <hr>
+    {% block content %} {% endblock %}
+</body>
+</html>
+app/templates/main/index.html
+HTML
+{% extends "base.html" %}
+{% block content %}
+    <h1>Bosh sahifaga xush kelibsiz!</h1>
+    <p>Eslatmalarni ko'rish uchun yuqoridagi menyudan foydalaning.</p>
+{% endblock %}
+app/templates/notes/list.html
+HTML
+{% extends "base.html" %}
+{% block content %}
+    <h1>Mening Eslatmalarim</h1>
+    <ul>
+        {% for note in notes %}
+            <li>
+                <strong>{{ note.title }}</strong>: {{ note.content }}
+            </li>
+        {% endfor %}
+    </ul>
+{% endblock %}
